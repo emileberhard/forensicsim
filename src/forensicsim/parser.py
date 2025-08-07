@@ -20,6 +20,7 @@ from forensicsim.backend import parse_db, write_results_to_json
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 
+
 def strip_html_tags(value: str) -> str:
     # Get the text of any embedded html, such as divs, a href links
     soup = BeautifulSoup(value, features="html.parser")

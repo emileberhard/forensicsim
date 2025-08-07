@@ -26,6 +26,10 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
+# Apply our fix for the V8 deserializer encoding issue BEFORE importing ccl_chromium_reader
+from forensicsim.fixed_v8_deserializer import patch_ccl_chromium_reader
+patch_ccl_chromium_reader()
+
 from ccl_chromium_reader import (
     ccl_chromium_indexeddb,
     ccl_chromium_localstorage,
