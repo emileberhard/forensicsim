@@ -37,14 +37,28 @@ def decode_dict(properties: Union[bytes, str, dict]) -> dict[str, Any]:
             # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
             for key, value in properties.items():
                 if isinstance(value, str) and value.startswith(("[", "{")):
-                    properties[key] = json.loads(value, strict=False)
+                    try:
+                        # First try normal JSON parsing
+                        properties[key] = json.loads(value, strict=False)
+                    except JSONDecodeError:
+                        # Try to fix escaped quotes in nested JSON
+                        try:
+                            # Replace escaped quotes that might be causing issues
+                            fixed_value = value.replace('\\"', '"')
+                            properties[key] = json.loads(fixed_value, strict=False)
+                        except JSONDecodeError:
+                            # If still failing, leave as string - don't print errors
+                            pass
             return properties
-    except JSONDecodeError as e:
-        print(e)
-        print("Couldn't decode dictionary ", properties)
+    except JSONDecodeError:
+        # Silently return empty dict for unparseable data
         return {}
 
-    return json.loads(properties, strict=False)
+    try:
+        return json.loads(properties, strict=False)
+    except JSONDecodeError:
+        # Silently return empty dict instead of printing errors
+        return {}
 
 
 def decode_timestamp(content_utf8_encoded: str) -> datetime:
@@ -209,7 +223,7 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
             p |= {"mri": p.get("mri")}
             p |= {"user_principal_name": p.get("userPrincipalName")}
         else:
-            print("Teams Version is unknown. Can not extract records of type people.")
+            pass  # Teams Version is unknown. Can not extract records of type people.
 
         parsed_people.add(Contact.from_dict(p))
     return parsed_people
@@ -229,7 +243,7 @@ def _parse_buddies(buddies: list[dict], version: str) -> set[Contact]:
                 b_of_b |= {"origin_file": b.get("origin_file")}
                 parsed_buddies.add(Contact.from_dict(b_of_b))
         else:
-            print("Teams Version is unknown. Can not extract records of type buddies.")
+            pass  # Teams Version is unknown. Can not extract records of type buddies.
     return parsed_buddies
 
 
@@ -252,7 +266,7 @@ def _parse_conversations(conversations: list[dict], version: str) -> set[Meeting
                 c |= {"cached_deduplication_key": c.get("id")}
                 cleaned_conversations.add(Meeting.from_dict(c))
         else:
-            print("Teams Version is unknown. Can not extract records of type meeting.")
+            pass  # Teams Version is unknown. Can not extract records of type meeting.
     return cleaned_conversations
 
 
@@ -273,9 +287,7 @@ def _parse_reply_chains(reply_chains: list[dict], version: str) -> set[Message]:
         elif version == "v2":
             message_dict = rc.get("value", {}).get("messageMap", {})
         else:
-            print(
-                "Teams Version is unknown. Can not extract records of type reply_chains."
-            )
+            # Teams Version is unknown. Can not extract records of type reply_chains.
             continue
 
         for k in message_dict:
@@ -370,6 +382,7 @@ def process_db(
     output_path: Path,
     blob_path: Optional[Path] = None,
     filter_db_results: Optional[bool] = True,
+    verbose: Optional[bool] = True,
 ) -> None:
     if not input_path.parts[-1].endswith(".leveldb"):
         raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
@@ -377,6 +390,6 @@ def process_db(
     if blob_path is not None and not blob_path.parts[-1].endswith(".blob"):
         raise ValueError(f"Expected a .blob folder. Path: {blob_path}")
 
-    extracted_values = parse_db(input_path, blob_path, filter_db_results)
+    extracted_values = parse_db(input_path, blob_path, filter_db_results, verbose)
     parsed_records = parse_records(extracted_values)
     write_results_to_json(parsed_records, output_path)

@@ -41,6 +41,7 @@ def parse_db(
     filepath: Path,
     blobpath: Optional[Path] = None,
     filter_db_results: Optional[bool] = True,
+    verbose: Optional[bool] = True,
 ) -> list[dict[str, Any]]:
     # Open raw access to a LevelDB and deserialize the records.
 
@@ -81,9 +82,10 @@ def parse_db(
                         "state": state,
                         "seq": seq,
                     })
-                print(
-                    f"{obj_store_name} {db.name} (Records: {records_per_object_store})"
-                )
+                if verbose:
+                    print(
+                        f"{obj_store_name} {db.name} (Records: {records_per_object_store})"
+                    )
     return extracted_values
 
 
@@ -102,7 +104,7 @@ def parse_sessionstorage(filepath: Path) -> list[dict[str, Any]]:
     session_storage = ccl_chromium_sessionstorage.SessionStoreDb(filepath)
     extracted_values = []
     for host in session_storage:
-        print(host)
+        # print(host)  # Commented out to reduce noise
         # Hosts can have multiple sessions associated with them
         for session_store_values in session_storage.get_all_for_host(host).values():
             for session_store_value in session_store_values:
@@ -125,4 +127,5 @@ def write_results_to_json(data: list[dict[str, Any]], outputpath: Path) -> None:
         with open(outputpath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, default=str, ensure_ascii=False)
     except OSError as e:
-        print(e)
+        # Re-raise the exception instead of just printing it
+        raise e
